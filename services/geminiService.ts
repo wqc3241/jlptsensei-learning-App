@@ -14,9 +14,9 @@ let audioContext: AudioContext | null = null;
 
 export const getAudioContext = (): AudioContext => {
   if (!audioContext) {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-      sampleRate: 24000, // Standard for Gemini 2.5 Flash TTS & Live
-    });
+    // IMPORTANT: Do not force sampleRate here. Let the browser pick the native hardware rate (e.g. 44.1k or 48k).
+    // Forcing it can cause silence or errors on some mobile devices/browsers.
+    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
   }
   return audioContext;
 };
@@ -46,6 +46,8 @@ export const decodeAudioData = (base64String: string, sampleRate: number = 24000
     float32Data[i] = int16Data[i] / 32768.0;
   }
 
+  // We specify the sample rate of the SOURCE audio here (24000 for Gemini TTS).
+  // The AudioContext (running at system rate, e.g., 48000) will handle the resampling automatically.
   const buffer = ctx.createBuffer(1, float32Data.length, sampleRate);
   buffer.getChannelData(0).set(float32Data);
   return buffer;
@@ -481,6 +483,7 @@ export const connectToLiveScenario = async (
   }});
   
   // Audio Context for Input (Microphone)
+  // Use 16k to match the Gemini Live requirement for input
   const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 16000});
   const source = inputAudioContext.createMediaStreamSource(stream);
   const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
@@ -508,6 +511,7 @@ export const connectToLiveScenario = async (
       responseModalities: [Modality.AUDIO],
       systemInstruction: `You are a native Japanese roleplay partner for a JLPT ${level} student. 
       Scenario: "${scenario}". 
+      IMPORTANT: You are the initiator. You MUST start the conversation immediately by greeting the user or asking a question related to the scenario. Do NOT wait for the user to speak first.
       Converse naturally in Japanese. Adjust difficulty to JLPT ${level}.
       If the user makes a mistake, politely correct it briefly in Japanese, then continue the roleplay.`,
       inputAudioTranscription: {},
@@ -539,6 +543,12 @@ export const connectToLiveScenario = async (
       },
       onerror: (e) => console.error("Live session error", e)
     }
+  });
+
+  // Trigger the start of the conversation by sending a text signal
+  sessionPromise.then((session) => {
+    // We send a text part to the model to force it to start, acting as a "system event" or user prompt to kick it off.
+    session.send({ parts: [{ text: "Start the roleplay now." }], turnComplete: true });
   });
 
   return {

@@ -83,13 +83,20 @@ const ExerciseView: React.FC = () => {
       },
       onTranscription: (text, isUser) => {
         setLiveTranscript(prev => {
-          // Simple logic to append text or update last message if streaming (simplified here to append)
-          // For a robust chat, we would debounce or track ID, but simple append works for now.
           const lastMsg = prev[prev.length - 1];
-          if (lastMsg && lastMsg.role === (isUser ? 'user' : 'model')) {
-             return [...prev, { id: Date.now().toString(), role: isUser ? 'user' : 'model', text }];
+          const role = isUser ? 'user' : 'model';
+          
+          // Append to last message if role matches (fixes fragmentation)
+          if (lastMsg && lastMsg.role === role) {
+             const updated = [...prev];
+             updated[updated.length - 1] = {
+                 ...lastMsg,
+                 text: lastMsg.text + text
+             };
+             return updated;
           }
-          return [...prev, { id: Date.now().toString(), role: isUser ? 'user' : 'model', text }];
+          // Otherwise start new message bubble
+          return [...prev, { id: Date.now().toString(), role, text }];
         });
       },
       onClose: () => {
@@ -273,7 +280,7 @@ const ExerciseView: React.FC = () => {
         {liveTranscript.length === 0 && (
            <div className="h-full flex flex-col items-center justify-center opacity-50">
              <Activity className="w-16 h-16 animate-pulse mb-4" />
-             <p className="text-sm">Listening... Speak now.</p>
+             <p className="text-sm">Connecting...</p>
            </div>
         )}
         {liveTranscript.map((msg, idx) => (
