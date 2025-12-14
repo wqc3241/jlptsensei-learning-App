@@ -1,5 +1,7 @@
 {
   "name": "JLPT Master",
   "description": "Your pocket guide to Japanese mastery. Access N5-N1 grammar, vocabulary, and sentence patterns with clear explanations and native examples.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
